@@ -131,10 +131,8 @@ prompt_pure_preprompt_render() {
 	# Initialize the preprompt array.
 	local -a preprompt_parts
 
-	# Username and machine, if applicable.
-	[[ -n $prompt_pure_state[username] ]] && preprompt_parts+=($prompt_pure_state[username])
-
 	# Set the path.
+	preprompt_parts+=('%F{${prompt_pure_colors[pathhead]}}#%f')
 	preprompt_parts+=('%F{${prompt_pure_colors[path]}}%~%f')
 
 	# Git branch and dirty status info.
@@ -624,13 +622,32 @@ prompt_pure_reset_prompt() {
 	zle && zle .reset-prompt
 }
 
+function mid_prompt {
+	if [ ${COLUMNS} -lt 60 ]; then
+		echo ""
+		return
+	fi
+	my_space="-"
+	(( spare_len = ${COLUMNS}  / 6 * 2))
+	my_box=""
+	[[ -n $prompt_pure_state[username] ]] && my_box="$(whoami)@$(hostname -s)"
+	(( spare_len = spare_len - ${#${my_box}} ))
+	myprompt=""
+	while [ ${#myprompt} -lt $spare_len ]; do
+		myprompt="$my_space$myprompt"
+	done
+	# myprompt="%{$reset_color%}%{$terminfo[bold]$fg[yellow]%}$myprompt"
+	myprompt="%F{$prompt_pure_colors[mid]}$myprompt%f"
+	echo $myprompt
+}
+
 prompt_pure_reset_prompt_symbol() {
-	prompt_pure_state[prompt]=${PURE_PROMPT_SYMBOL:-❯}
+	prompt_pure_state[prompt]=${PURE_PROMPT_SYMBOL:-➤}
 }
 
 prompt_pure_update_vim_prompt_widget() {
 	setopt localoptions noshwordsplit
-	prompt_pure_state[prompt]=${${KEYMAP/vicmd/${PURE_PROMPT_VICMD_SYMBOL:-❮}}/(main|viins)/${PURE_PROMPT_SYMBOL:-❯}}
+	prompt_pure_state[prompt]=${${KEYMAP/vicmd/${PURE_PROMPT_VICMD_SYMBOL:-❮}}/(main|viins)/${PURE_PROMPT_SYMBOL:-➤}}
 
 	prompt_pure_reset_prompt
 }
@@ -695,7 +712,7 @@ prompt_pure_state_setup() {
 	prompt_pure_state[version]="1.13.0"
 	prompt_pure_state+=(
 		username "$username"
-		prompt	 "${PURE_PROMPT_SYMBOL:-❯}"
+		prompt	 "${PURE_PROMPT_SYMBOL:-➤}"
 	)
 }
 
@@ -799,12 +816,14 @@ prompt_pure_setup() {
 		git:action           yellow
 		git:dirty            218
 		host                 242
-		path                 blue
+		path                 magenta
+		pathhead             blue
 		prompt:error         red
 		prompt:success       magenta
 		prompt:continuation  242
 		user                 242
 		user:root            default
+		mid                  yellow
 		virtualenv           242
 	)
 	prompt_pure_colors=("${(@kv)prompt_pure_colors_default}")
@@ -825,8 +844,14 @@ prompt_pure_setup() {
 	# If a virtualenv is activated, display it in grey.
 	PROMPT='%(12V.%F{$prompt_pure_colors[virtualenv]}%12v%f .)'
 
+	local prompt_indicator=""
+	# Username and machine, if applicable.
+	[[ -n $prompt_pure_state[username] ]] && prompt_indicator=($prompt_pure_state[username])
+	# mid -----
+	prompt_indicator+=$(mid_prompt)
 	# Prompt turns red if the previous command didn't exit with 0.
-	local prompt_indicator='%(?.%F{$prompt_pure_colors[prompt:success]}.%F{$prompt_pure_colors[prompt:error]})${prompt_pure_state[prompt]}%f '
+	prompt_indicator+='%(?.%F{$prompt_pure_colors[prompt:success]}.%F{$prompt_pure_colors[prompt:error]})${prompt_pure_state[prompt]}%f '
+
 	PROMPT+=$prompt_indicator
 
 	# Indicate continuation prompt by … and use a darker color for it.
